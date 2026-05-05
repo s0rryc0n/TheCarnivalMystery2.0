@@ -11,13 +11,13 @@
 #include <cstdlib>                          
 #include <ctime>                                 
 #include <iomanip>                               
-#include <iostream>                            
+#include <iostream>                           
 #include <set>                                      
 #include <string>                                  
 #include <thread>                                    
 #include <vector>                                 
 #include <algorithm>                             
-#include <map>                                        
+#include <map>         
 using namespace std;
 using namespace std::chrono;
 
@@ -107,6 +107,8 @@ struct Player
     vector<string> premiumClues;
     vector<string> items;
     map<string, pair<string, string>> contacts;
+    string keyword;
+    string keywordSentence;
 
     //checks if player has item
     bool hasBasicStopwatch = false;
@@ -114,8 +116,7 @@ struct Player
     bool hasPlayfulStopwatch = false;
     bool hasGreedyStopwatch = false;
     bool hasCompetitiveStopwatch = false;
-    bool hasShield = false;
-    bool hasTicket = false;
+    bool hasNewspaper = false;
 
     //checks if player has contact
     bool hasAbel = false;
@@ -149,7 +150,7 @@ struct Player
     bool completedFoodClue6 = false;
     bool completedFoodClue7 = false;
     bool completedFoodClue8 = false;
-    bool completed1WinEachGame = false;
+    bool completed1WinFor7Games = false;
     bool completed7WinsFor1Game = false;
 
     //checks if player has ride clue
@@ -686,7 +687,7 @@ void playColorGame(Player& player, GameBooth& colorGame)
     }
 }
 
-//4.6 - Counting Game: player has a time limit to memorize a sequence of numbers
+//4.6 - Memory Game: player has a time limit to memorize a sequence of numbers
 void playMemoryGame(Player& player, GameBooth& memoryGame, const vector<string>& foodClueSet1, int foodClue1Index)
 {
     //set variables
@@ -694,7 +695,7 @@ void playMemoryGame(Player& player, GameBooth& memoryGame, const vector<string>&
     int timeLimit = 10;
 
     //instructions
-    cout << "\nGOAL: Memorize the sequence of numbers. When it disappears, type it back."
+    cout << "\nGOAL: Memorize the sequence of numbers. When it disappears, then type it back."
         << "\nTIME TO MEMORIZE: " << memorizeTime << " seconds"
         << "\nTIME TO TYPE: " << timeLimit << " seconds"
         << "\n\nPress ENTER to start...";
@@ -713,6 +714,43 @@ void playMemoryGame(Player& player, GameBooth& memoryGame, const vector<string>&
 
     //flash sequence
     cout << "\n" << sequence;
+    //-------------------------------------------------------------------------------------------------- this should produce confusion if they try to cheat
+     //thread watches for early input during memorize window
+    bool cheatDetected = false;
+    string cheatedInput = "";
+    bool memorizeOver = false;
+
+    thread watchThread([&]()
+    {
+        getline(cin, cheatedInput);
+        if (!memorizeOver)
+            cheatDetected = true;
+    });
+
+    this_thread::sleep_for(seconds(memorizeTime));
+    memorizeOver = true;
+
+    //hide sequence
+    cout << "\r" << string(sequence.length(), ' ') << "\r";
+
+    //if they cheated, their input is garbled and wrong
+    if (cheatDetected)
+    {
+        watchThread.join();
+        cout << "\nEnter the sequence: " << cheatedInput;
+        cout << "\nWrong! The correct sequence was " << sequence << ".\n";
+        return;
+    }
+
+    //normal flow
+    auto start = steady_clock::now();
+    cout << "Enter the sequence: ";
+    watchThread.join();
+    input = cheatedInput;
+    auto end = steady_clock::now();
+    int duration = duration_cast<seconds>(end - start).count();
+    //------------------------------------------------------------------------------------------------- this is og version that allowed cheating
+    /*
     this_thread::sleep_for(seconds(memorizeTime));
 
     //hide sequence
@@ -724,6 +762,7 @@ void playMemoryGame(Player& player, GameBooth& memoryGame, const vector<string>&
     getline(cin, input);
     auto end = steady_clock::now();
     int duration = duration_cast<seconds>(end - start).count();
+    */
 
     //if player solves a secret, they are rewarded accordingly
     if (player.hasFoodClue1 && (duration <= timeLimit) && (input == foodClueSet1[foodClue1Index]))
@@ -877,11 +916,11 @@ void playArcheryGame(Player& player, GameBooth& archeryGame, int foodClue2Index)
 
     //calculates if player completed secret
     bool playerCompletedArcherySecret = false;
-    if (foodClue2Index == 0 && finalPos == 0)
+    if (foodClue2Index == 0 && finalPos <= 2)
     {
         playerCompletedArcherySecret = true;
     }
-    else if (foodClue2Index == 1 && finalPos == width - 1)
+    else if (foodClue2Index == 1 && finalPos >= width - 3)
     {
         playerCompletedArcherySecret = true;
     }
@@ -1166,6 +1205,7 @@ void playGridGame(Player& player, GameBooth& gridGame, int foodClue5Index)
             set<int> heart = { 2, 8, 4, 6, 11, 10, 15, 17, 19, 23 };
             set<int> oddCheckerboard = { 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25 };
             set<int> evenCheckerboard = { 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24 };
+			set<int> X = { 1, 5, 7, 9, 13, 17, 19, 21, 25 };
 
             //checks if player completed a secret for this game
             bool playerCompletedGridSecret = false;
@@ -1178,6 +1218,10 @@ void playGridGame(Player& player, GameBooth& gridGame, int foodClue5Index)
                 playerCompletedGridSecret = true;
             }
             else if (foodClue5Index == 2 && guesses == oddCheckerboard || guesses == evenCheckerboard)
+            {
+                playerCompletedGridSecret = true;
+            }
+            else if (foodClue5Index == 3 && guesses == X)
             {
                 playerCompletedGridSecret = true;
             }
@@ -1296,7 +1340,7 @@ void playScanningGame(Player& player, GameBooth& scanningGame, int foodClue7Inde
             //prints near-black symbol
             else if (isSymbol)
             {
-                cout << "\033[48;2;0;0;0m\033[38;2;7;7;7m" << symbol << "\033[0m";
+                cout << "\033[48;2;0;0;0m\033[38;2;5;5;5m" << symbol << "\033[0m";
             }
             //prints secret symbol
             else if (isSecret)
@@ -1578,7 +1622,7 @@ void rideHouseOfBalloons(Player& player, Ride& houseOfBalloons, vector<string>& 
     cout << "You have: " << player.tokenCount << " token" << (player.tokenCount == 1 ? "" : "s") << "\n";
     
     cout << "\nIn this ride, you have a:\n";
-    cout << "- 30% chance of getting lost\n";
+    cout << "- 30% chance of getting lost (& potentially lose 90 minutes)\n";
 	cout << "- 100% chance of getting a clue (" << player.ride1ClueCount << "/7)\n";
 
     //prompt to continue or leave
@@ -1781,7 +1825,7 @@ void rideNightcrawler(Player& player, Ride& nightcrawler, vector<string>& rideCl
     cout << "You have: " << player.tokenCount << " token" << (player.tokenCount == 1 ? "" : "s") << "\n";
 
     cout << "\nIn this ride, you have a:\n";
-    cout << "- 30% chance of getting stuck on the roller coaster\n";
+    cout << "- 30% chance of getting stuck on the roller coaster (& potentially lose 90 minutes)\n";
     cout << "- 100% chance of getting a clue (" << player.ride2ClueCount << "/7)\n";
 
     //prompt user
@@ -2119,10 +2163,10 @@ void buyGreedyStopwatch(Player& player)
         cout << "\nYou obtained GREEDY STOPWATCH: ";
         player.hasGreedyStopwatch = true;
         player.items.push_back("Greedy Stopwatch");
-        cout << "Travel back " << (player.tokenCount * 3)
+        cout << "Travel back " << (player.tokenCount * 2)
             << " minutes because you have " << player.tokenCount
             << " token" << (player.tokenCount == 1 ? "" : "s") << "\n";
-        player.clock -= (player.tokenCount * 3);
+        player.clock -= (player.tokenCount * 2);
     }
     else
     {
@@ -2137,10 +2181,10 @@ void buyCompetitiveStopwatch(Player& player)
         cout << "\nYou obtained COMPETITIVE STOPWATCH: ";
         player.hasCompetitiveStopwatch = true;
         player.items.push_back("Competitive Stopwatch");
-        cout << "Travel back " << (player.winCount * 3)
+        cout << "Travel back " << (player.winCount * 2)
             << " minutes because you have " << player.winCount
             << " win" << (player.winCount == 1 ? "" : "s") << "\n";
-        player.clock -= (player.winCount * 3);
+        player.clock -= (player.winCount * 2);
     }
     else
     {
@@ -2148,34 +2192,43 @@ void buyCompetitiveStopwatch(Player& player)
         player.scrollCount += 3;
     }
 }
-void buyShield(Player& player)
+void buyNewspaper(Player& player)
 {
-    if (!player.hasShield)
+    if (!player.hasNewspaper)
     {
-        cout << "\nYou obtained a SHIELD: ";
-        player.hasShield = true;
-        player.items.push_back("Shield");
-        cout << "You can now defend yourself against a throat punch.\n";
+        cout << "\nYou obtained a NEWSPAPER: ";
+        player.hasNewspaper = true;
+        player.items.push_back("Newspaper");
+        cout << "An old carnival headline...\n";
+
+        cout << "\nPress ENTER to read...";
+        string input;
+        getline(cin, input);
+
+        cout << "\n\033[38;2;210;180;140m--- THE CARNIVAL CHRONICLE ---\033[0m\n\n";
+
+        cout << "MAGIC SHOW GONE WRONG: AUDIENCE MEMBER INJURED\n\n";
+
+        cout << "Last year, celebrated carnival magician Gus the Great performed his signature act -\n";
+        cout << "a dramatic illusion involving live pyrotechnics and a buried escape from a ring of fire.\n\n";
+
+        cout << "Midway through the performance, a misfired pyrotechnic ignited the stage curtain.\n";
+        cout << "The flames spread faster than staff could respond, and an audience member seated\n";
+        cout << "in the front row suffered burns before being evacuated.\n\n";
+
+        cout << "Gus has not spoken publicly since the incident.\n";
+        cout << "Witnesses say he disappeared before the smoke had cleared.\n";
+        cout << "The injured audience member is said to be recovering in the local hospital.\n\n";
+
+        cout << "The carnival has announced that they are uncertain whether Gus will return for this year's show.\n";
+        cout << "No further comment has been made.\n\n";
+
+        cout << "The Carnival Chronicle wishes Gus and the victim well: " << player.keywordSentence << "\n";
     }
     else
     {
-        cout << "\nYou already bought this item.\n";
-        player.scrollCount += 3;
-    }
-}
-void buyTicket(Player& player)
-{
-    if (!player.hasTicket)
-    {
-        cout << "\nYou obtained a TICKET: ";
-        player.hasTicket = true;
-        player.items.push_back("Ticket");
-        cout << "You can now make someone happy if needed.\n";
-    }
-    else
-    {
-        cout << "\nYou already bought this item.\n";
-        player.scrollCount += 3;
+        cout << "\nYou already have this item.\n";
+        player.scrollCount += 5;
     }
 }
 void buyAbel(Player& player)
@@ -2240,22 +2293,22 @@ void buyMaria(Player& player)
         player.scrollCount += 1;
     }
 }
-void buyDigitReveal(Player& player)
+void buyPositionReveal(Player& player)
 {
     //if player does not have item yet
-    if (!player.hasDigitReveal)
+    if (!player.hasPositionReveal)
     {
-        cout << "\nYou obtained a DIGIT REVEAL";
-        player.hasDigitReveal = true;
+        cout << "\nYou obtained a POSITION REVEAL";
+        player.hasPositionReveal = true;
         cout << "!\n";
 
         //prompt the user the corresponding benefit
         int choice = getValidInt("\nEnter the digit whose position you want to reveal (0-9): ", 0, 9);
         int pos = player.passcode.find(to_string(choice));
         string clue = "The digit " + to_string(choice) + " is at position " + to_string(pos + 1) + ".";
-        cout << "\nDigit Reveal: " << clue << "\n";
+        cout << "\nPosition Reveal: " << clue << "\n";
 
-        player.premiumClues.push_back("Digit Reveal: " + clue); //add clue to vector
+        player.premiumClues.push_back("Position Reveal: " + clue); //add clue to vector
     }
     else
     {
@@ -2264,20 +2317,20 @@ void buyDigitReveal(Player& player)
         player.scrollCount += 5;
     }
 }
-void buyPositionReveal(Player& player)
+void buyDigitReveal(Player& player)
 {
-    if (!player.hasPositionReveal)
+    if (!player.hasDigitReveal)
     {
-        cout << "\nYou obtained a POSITION REVEAL";
-        player.hasPositionReveal = true;
+        cout << "\nYou obtained a DIGIT REVEAL";
+        player.hasDigitReveal = true;
         cout << "!\n";
 
         int choice = getValidInt("\nEnter the position whose digit you want to reveal (1-10): ", 1, 10);
         int digit = player.passcode[choice - 1] - '0';
         string clue = "The digit at position " + to_string(choice) + " is " + to_string(digit) + ".";
-        cout << "\nPosition Reveal: " << clue << "\n";
+        cout << "\nDigit Reveal: " << clue << "\n";
 
-        player.premiumClues.push_back("Position Reveal: " + clue);
+        player.premiumClues.push_back("Digit Reveal: " + clue);
     }
     else
     {
@@ -2383,30 +2436,30 @@ void visitGiftShop(Player& player)
     printShopItem("1. Basic Stopwatch         2 Scrolls       Takes you back in time by a flat 40 minutes\n", player.hasBasicStopwatch);
     printShopItem("2. Precise Stopwatch       2 Scrolls       Takes you back in time to the nearest hour\n", player.hasPreciseStopwatch);
     printShopItem("3. Playful Stopwatch       3 Scrolls       Takes you back in time (0-100 minutes) based on a minigame\n", player.hasPlayfulStopwatch);
-    printShopItem("4. Greedy Stopwatch        3 Scrolls       Takes you back in time 3 minutes for every token you currently have\n", player.hasGreedyStopwatch);
-    printShopItem("5. Competitive Stopwatch   3 Scrolls       Takes you back in time 3 minutes for every carnival win you have\n", player.hasCompetitiveStopwatch);
-    printShopItem("6. Shield                  3 Scrolls       Can defend a punch in the throat\n", player.hasShield);
-    printShopItem("7. Ticket                  3 Scrolls       Can make someone happy\n\n", player.hasTicket);
+    printShopItem("4. Greedy Stopwatch        3 Scrolls       Takes you back in time 2 minutes for every token you currently have\n", player.hasGreedyStopwatch);
+    printShopItem("5. Competitive Stopwatch   3 Scrolls       Takes you back in time 2 minutes for every carnival win you currently have\n", player.hasCompetitiveStopwatch);
+    printShopItem("6. Newspaper               5 Scrolls       An old carnival newspaper from last year\n\n", player.hasNewspaper);
 
     cout << "CONTACTS                   COST            DESCRIPTION\n";
-    printShopItem("8. Abel                    1 Scroll        House of Balloons employee; finishes helping you in 15 minutes\n", player.hasAbel);
-    printShopItem("9. Valerie                 1 Scroll        House of Balloons employee; finishes helping you in the nearest half hour\n", player.hasValerie);
-    printShopItem("10. Jacques                1 Scroll        Nightcrawler employee; takes 1 minute to help you for every token you have\n", player.hasJacques);
-    printShopItem("11. Maria                  1 Scroll        Nightcrawler employee; takes 5 minutes on odd hours & 30 minutes on even hours\n\n", player.hasMaria);
+    printShopItem("7. Abel                    1 Scroll        House of Balloons employee; finishes helping you in 15 minutes\n", player.hasAbel);
+    printShopItem("8. Valerie                 1 Scroll        House of Balloons employee; finishes helping you in the nearest half hour\n", player.hasValerie);
+    printShopItem("9. Jacques                 1 Scroll        Nightcrawler employee; takes 1 minute to help you for every token you have\n", player.hasJacques);
+    printShopItem("10. Maria                  1 Scroll        Nightcrawler employee; takes 5 minutes on odd hours & 30 minutes on even hours\n\n", player.hasMaria);
 
     cout << "PREMIUM CLUES              COST            DESCRIPTION\n";
-    printShopItem("12. Digit Reveal           5 Scrolls       Enter any digit to reveal its position\n", player.hasDigitReveal);
-    printShopItem("13. Position Reveal        5 Scrolls       Enter any position to reveal the digit\n", player.hasPositionReveal);
-    printShopItem("14. Neighbor Reveal        5 Scrolls       Enter any digit to reveal its neighboring digits\n", player.hasNeighborReveal);
-    printShopItem("15. Order Reveal           5 Scrolls       Enter two digits to reveal which digit comes first\n", player.hasOrderReveal);
-    printShopItem("16. Space Reveal           5 Scrolls       Enter two digits to reveal how much space is in between them\n\n", player.hasSpaceReveal);
+    printShopItem("11. Position Reveal        5 Scrolls       Enter any digit to reveal its position\n", player.hasPositionReveal);
+    printShopItem("12. Digit Reveal           5 Scrolls       Enter any position to reveal the digit\n", player.hasDigitReveal);
+    printShopItem("13. Neighbor Reveal        5 Scrolls       Enter any digit to reveal its neighboring digits\n", player.hasNeighborReveal);
+    printShopItem("14. Order Reveal           5 Scrolls       Enter two digits to reveal which digit comes first\n", player.hasOrderReveal);
+    printShopItem("15. Space Reveal           5 Scrolls       Enter two digits to reveal how much space is in between them\n\n", player.hasSpaceReveal);
+    
+    cout << "16. Back\n";
 
-    cout << "17. Back\n";
-
+    cout << "\n* To get more scrolls, solve the FOOD CLUES";
     cout << "\n* All items can only be bought once\n";
 
     //prompt user
-    int choice = getValidInt("\nWhat would you like to get? (1-17): ", 1, 17);
+    int choice = getValidInt("\nWhat would you like to get? (1-16): ", 1, 16);
 
     //buy items respectively
     if (choice == 1 && player.scrollCount >= 2)
@@ -2434,35 +2487,35 @@ void visitGiftShop(Player& player)
         player.scrollCount -= 3;
         buyCompetitiveStopwatch(player);
     }
-    else if (choice == 6 && player.scrollCount >= 3)
+    else if (choice == 6 && player.scrollCount >= 5)
     {
-        player.scrollCount -= 3;
-        buyShield(player);
+		player.scrollCount -= 5;
+        buyNewspaper(player);
     }
-    else if (choice == 7 && player.scrollCount >= 3)
-    {
-        player.scrollCount -= 3;
-        buyTicket(player);
-    }
-    else if (choice == 8 && player.scrollCount >= 1)
+    else if (choice == 7 && player.scrollCount >= 1)
     {
         player.scrollCount -= 1;
         buyAbel(player);
     }
-    else if (choice == 9 && player.scrollCount >= 1)
+    else if (choice == 8 && player.scrollCount >= 1)
     {
         player.scrollCount -= 1;
         buyValerie(player);
     }
-    else if (choice == 10 && player.scrollCount >= 1)
+    else if (choice == 9 && player.scrollCount >= 1)
     {
         player.scrollCount -= 1;
         buyJacques(player);
     }
-    else if (choice == 11 && player.scrollCount >= 1)
+    else if (choice == 10 && player.scrollCount >= 1)
     {
         player.scrollCount -= 1;
         buyMaria(player);
+    }
+    else if (choice == 11 && player.scrollCount >= 5)
+    {
+        player.scrollCount -= 5;
+        buyPositionReveal(player);
     }
     else if (choice == 12 && player.scrollCount >= 5)
     {
@@ -2472,24 +2525,19 @@ void visitGiftShop(Player& player)
     else if (choice == 13 && player.scrollCount >= 5)
     {
         player.scrollCount -= 5;
-        buyPositionReveal(player);
+        buyNeighborReveal(player);
     }
     else if (choice == 14 && player.scrollCount >= 5)
     {
         player.scrollCount -= 5;
-        buyNeighborReveal(player);
+        buyOrderReveal(player);
     }
     else if (choice == 15 && player.scrollCount >= 5)
     {
         player.scrollCount -= 5;
-        buyOrderReveal(player);
-    }
-    else if (choice == 16 && player.scrollCount >= 5)
-    {
-        player.scrollCount -= 5;
         buySpaceReveal(player);
     }
-    else if (choice == 17)
+    else if (choice == 16)
     {
         cout << "\nYou exit the Gift Shop empty-handed.\n";
         player.actionCompleted = false;
@@ -2507,91 +2555,255 @@ void visitGiftShop(Player& player)
 //-------------------+ |
 //---------------------+
 
+void flashbackSequence()
+{
+    vector<string> fragments =
+    {
+        "THE BIGGEST SHOW YET.",
+        "THE CROWD.",
+        "THE LIGHTS.",
+        "THE FIRE.",
+        "THE SCREAMING.",
+        "THE SMOKE.",
+        "RUN.",
+        "HIDE.",
+        "FORGET.",
+        "...",
+        "I REMEMBER NOW",
+        "I REMEMBER EVERYTHING"
+    };
+
+    for (const string& frag : fragments)
+    {
+        //fade from white to red to black
+        vector<tuple<int, int, int>> colors =
+        {
+            {255, 255, 255}, //white
+            {255, 200, 200},
+            {255, 150, 150},
+            {255, 80,  80 },
+            {255, 0,   0  }, //red
+            {180, 0,   0  },
+            {100, 0,   0  },
+            {40,  0,   0  },
+            {0,   0,   0  }, //black
+        };
+
+        for (auto& [r, g, b] : colors)
+        {
+            cout << "\r" << string(60, ' ') << "\r";
+            cout << "\033[38;2;" << r << ";" << g << ";" << b << "m" << frag << "\033[0m";
+            this_thread::sleep_for(milliseconds(100));
+        }
+    }
+
+    //clear after sequence ends
+    cout << "\r" << string(60, ' ') << "\r";
+    this_thread::sleep_for(milliseconds(600));
+}
+
 //8.1 - Magic Tent: where magician is
 bool visitMagicTent(Player& player)
 {
     //tells user that they need to enter passcode
-    cout << "\nThe tent is locked! You need to enter a 10-digit non-repeating passcode to get in!\n";
+    cout << "\nThe tent is locked!\n";
+    cout << "You need to enter a 10-digit non-repeating passcode AND a keyword to get in.\n";
     cout << "1. Enter the passcode\n";
     cout << "2. Leave the tent\n";
 
     int choice = getValidInt("\nWhat do you do? (1-2): ", 1, 2);
 
-    if (choice == 1)
-    {
-        //they enter passcode
-        cout << "\nPASSCODE: ";
-        string choice;
-        cin >> choice;
-
-        //if right, access granted
-        if (choice == player.passcode)
-        {
-            cout << "\n\033[38;2;0;255;0mACCESS GRANTED\033[0m\n";
-        }
-        //if wrong, access denied
-        else
-        {
-            cout << "\n\033[38;2;255;0;0mACCESS DENIED\033[0m\n";
-            cin.ignore();
-            return false;
-        }
-    }
     //when players choose to not enter passcode
-    else
+    if (choice == 2)
     {
         cout << "\nYou exit the tent area, hoping to find more clues.\n";
         player.actionCompleted = false;
         return false;
     }
 
+    //they enter passcode
+    cout << "\nPASSCODE: ";
+    string input;
+    cin >> input;
+
+    if (input != player.passcode)
+    {
+        cout << "\n\033[38;2;255;0;0mPASSCODE DENIED\033[0m\n";
+        cin.ignore();
+        return false;
+    }
+
+    cout << "\n\033[38;2;0;255;0mPASSCODE ACCEPTED\033[0m\n";
+
+    //keyword prompt
+    cout << "\nKEYWORD: ";
+    string keywordInput;
+    cin >> keywordInput;
+    cin.ignore();
+
+    if (keywordInput != player.keyword)
+    {
+        cout << "\n\033[38;2;255;0;0mKEYWORD DENIED\033[0m\n";
+        return false;
+    }
+
+    cout << "\n\033[38;2;0;255;0mKEYWORD GRANTED\033[0m\n";
+
     cout << "\nPress ENTER to continue...";
     string enter;
     getline(cin, enter);
 
     //continues the story if player got the passcode correct
-    cout << "\n\nSCENE 1: CONFRONTATION";
-    cout << "\nYou unlock the Magic Tent.";
-    cout << "\nAnd an unknown person wearing all black immediately punches you in the throat.";
+    cout << "\n\033[38;2;150;150;230mSCENE 1: CONFRONTATION";
+    cout << "\n----------------------\033[0m";
+    cout << "\n\nYou step inside the Magic Tent.";
+    cout << "\nA figure dressed in all black stands at the center, back turned.\n";
 
-    //player is forced out of the tent if they do not have the shield
-    if (!player.hasShield)
-    {
-        cout << "\nAnd you fly out of the tent!\n";
-        return false;
-    }
-
-    //if the player has the shield, they can block the kidnapper's attack
-    cout << "\nBut your shield blocks the attack!\n";
-
-    cout << "\nPress ENTER to continue...";
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
     getline(cin, enter);
 
-    //continues story if player used shield
-    cout << "\nSCENE 2: NEGOTIATION";
-    cout << "\nYOU: Why did you kidnap Gus the Great?";
-    cout << "\nKIDNAPPER: I just wanted a ticket to see his show. Do you have a spare?";
+    cout << "\nYOU: Who are you? Where is Gus the Great?\n";
 
-    //player is forced out of tent if they don't have ticket
-    if (!player.hasTicket)
-    {
-        cout << "\nYOU: No I don't.";
-        cout << "\nAs a result, the kidnapper drop kicks you out of the tent!\n";
-        return false;
-    }
-
-    //continues story if player used ticket
-    cout << "\nYOU: Yes I do. Here it is.";
-    cout << "\nYou give the kidnapper your ticket.";
-    cout << "\nKIDNAPPER: Thank you so much! I am sorry, and I will let go of Gus now.\n";
-
-    cout << "\nPress ENTER to continue...";
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
     getline(cin, enter);
 
-    //player saves Gus
-    cout << "\nSCENE 3: CONGRATULATIONS " << player.name << "!";
-    cout << "\nYou saved Gus, and the show continues!";
-    cout << "\nGus rewards you with VIP tickets!\n";
+    cout << "\nKIDNAPPER: ...You really don't know, do you?\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\n\033[38;2;150;150;230mSCENE 2: THE REVEAL";
+    cout << "\n-------------------\033[0m";
+    cout << "\n\nYOU: No... I'm looking for Gus. Someone sent me clues. I followed them here.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nKIDNAPPER: I know. I sent them.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nYOU: Then where is he? What did you do with him?\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nKIDNAPPER: Nothing. I didn't do anything with him.\n";
+    cout << "           You've been wandering your own carnival all day.\n";
+    cout << "           Playing your own games. Eating your own food. Riding your own rides.\n";
+    cout << "           Who else would move through this place exactly like that?\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nYOU: What are you saying?\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+	cout << "\nKIDNAPPER: I'm saying...";
+    this_thread::sleep_for(seconds(1));
+    cout << " You";
+    this_thread::sleep_for(seconds(1));
+    cout << " are";
+    this_thread::sleep_for(seconds(1));
+    cout << " Gus the Great!\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nYOU: No... no... this isn't right. I can't be Gus. I'm " << player.name << "\n";
+    cout << "     I'm not a magician. I've never performed in my life.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+	cout << "\nKIDNAPPER: Oh, but you are Gus. You just don't remember it yet.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nKIDNAPPER: Why do you think I tried so hard to get you to mimic the FOOD CLUES?";
+    cout << "\n           I was trying to get you to remember your old self.";
+    cout << "\n           The old self that ran away from the accident last year.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    flashbackSequence();
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\n\033[38;2;150;150;230mSCENE 3: THE EXPLANATION";
+    cout << "\n------------------------\033[0m";
+    cout << "\n\nYOU: Oh no... What have I done?\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nThe figure turns around and removes his hood. You somehow recognize him. The burn scars. It's the victim.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nKIDNAPPER: I was in the front row that day. I got burned because of the accident.\n";
+    cout << "           I was angry that you just ran away. But as time went on, I realized that it wasn't your fault.\n";
+    cout << "           I spent months trying to find you, sending you on this wild treasure hunt.\n";
+	cout << "           Not to hurt you, but just to see you again. I wanted to confront you, to understand why you left me there.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+	cout << "\nYOU: I'm sorry. I didn't know what to do. I panicked and ran. I thought I was doing the right thing at the time.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+	cout << "\nKIDNAPPER: I know, and I forgive you. But hiding doesn't undo anything. The show must go on.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nYOU: Why forgive me? After everything?\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nKIDNAPPER: Because I watched you out there today.\n";
+    cout << "           Playing those games. Moving through this place.\n";
+    cout << "           You were already punishing yourself. You just didn't know it.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nYOU: Ok. I will come back and perform tonight. As Gus the Great. Thank you for this second chance.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\n\033[38;2;150;150;230mSCENE 4: THE SHOW GOES ON";
+    cout << "\n-------------------------\033[0m";
+    cout << "\n\nCONGRATULATIONS, GUS... or " << player.name << ".\n";
+
+    cout << "\nYou remember now.\n";
+    cout << "You were never looking for a kidnapped Gus.\n";
+    cout << "You were searching for the version of yourself you repressed after that traumatic night.\n";
+
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nEvery clue you followed today was a trail back to yourself.\n";
+    cout << "The games you played. The food you ordered. The rides you took.\n";
+    cout << "You knew this place because this place was yours.\n";
+    
+    cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+    getline(cin, enter);
+
+    cout << "\nTonight, for the first time in a year, Gus the Great steps back onto the stage.\n";
+    cout << "And in the front row, one seat is reserved. For the only person who believed the show should go on.\n";
+
     player.savedGus = true;
 
     return true; //causes the game to be over now that Gus has been saved
@@ -2610,9 +2822,31 @@ void viewInventory(Player& player)
     }
     else
     {
-        for (int i = 0; i < player.foodClues.size(); ++i)
+        // map each clue index to its completed bool
+        bool completedFlags[] = {
+            player.completedFoodClue1, player.completedFoodClue2,
+            player.completedFoodClue3, player.completedFoodClue4,
+            player.completedFoodClue5, player.completedFoodClue6,
+            player.completedFoodClue7, player.completedFoodClue8
+        };
+        bool hasFlags[] = {
+            player.hasFoodClue1, player.hasFoodClue2,
+            player.hasFoodClue3, player.hasFoodClue4,
+            player.hasFoodClue5, player.hasFoodClue6,
+            player.hasFoodClue7, player.hasFoodClue8
+        };
+
+        int displayIndex = 1;
+        for (int i = 0; i < 8; ++i)
         {
-            cout << i + 1 << ". " << player.foodClues[i] << "\n";
+            if (hasFlags[i])
+            {
+                if (completedFlags[i])
+                    cout << "\033[38;2;0;150;0m" << displayIndex << ". " << player.foodClues[displayIndex - 1] << " [SOLVED]\033[0m\n";
+                else
+                    cout << displayIndex << ". " << player.foodClues[displayIndex - 1] << "\n";
+                ++displayIndex;
+            }
         }
     }
 
@@ -2645,7 +2879,7 @@ void viewInventory(Player& player)
     }
 
     //view items
-    cout << "\nITEMS (" << player.items.size() << "/7)\n";
+    cout << "\nITEMS (" << player.items.size() << "/6)\n";
     if (player.items.empty())
     {
         cout << "- You have not unlocked any Items yet.\n";
@@ -2674,6 +2908,21 @@ void viewInventory(Player& player)
         }
     }
 
+    int newspaperClues = 0;
+    if (player.hasNewspaper)
+    {
+        newspaperClues = 1;
+    }
+	cout << "\nNEWSPAPER CLUE (" << newspaperClues << "/1)\n";
+	if (!player.hasNewspaper)
+    {
+        cout << "- You have not unlocked the Newspaper yet.\n";
+    }
+    else
+    {
+        cout << "1. " << "The Carnival Chronicle wishes Gus and the victim well: " << player.keywordSentence << "\n";
+    }
+
     //this is not a real move so player can check as much as they want
     player.actionCompleted = false;
 }
@@ -2692,16 +2941,16 @@ int main()
     //pool of food clues, not all will be in play during a full game
     vector<string> foodClueSet1 =
     {
-        "90210", "3500"
+        "902103500", "350090210", "420696721", "676942021"
     };
     vector<string> foodClueSet2 =
     {
-        "Gus was so bad at archery, he would always aim at the left edge.",
-        "Gus was so bad at archery, he would always aim at the right edge."
+        "Gus was so bad at archery, he would always aim at the 3 leftmost spots.",
+        "Gus was so bad at archery, he would always aim at the 3 rightmost spots."
     };
     vector<int> foodClueSet3 =
     {
-        3, 5, 7, 10
+        3, 4, 5, 6, 7, 8, 9, 10
     };
     vector<string> foodClueSet4 =
     {
@@ -2712,7 +2961,8 @@ int main()
     {
         "Gus liked to draw out the letter \"G\" wherever he could.",
         "Gus liked to draw the outline of a heart wherever he could.",
-        "Gus liked to draw a checkerboard pattern wherever he could."
+        "Gus liked to draw a checkerboard pattern wherever he could.",
+        "Gus liked to draw out the letter \"X\" wherever he could."
     };
     vector<string> foodClueSet6 =
     {
@@ -2751,11 +3001,11 @@ int main()
     vector<string> foodClueSet7 =
     {
         "When singing songs, Gus always liked to shout his lyrics.",
-        "Gus always believed that the scanning game hid something darker."
+        "Gus always believed that the scanning game hid something more sinister."
     };
     vector<string> foodClueSet8 =
     {
-        "One day, Gus hopes to beat every carnival game at least once.",
+        "One day, Gus hopes to beat 7 carnival games at least once.",
         "One day, Gus hopes to beat any carnival game at least 7 times."
     };
 
@@ -2895,6 +3145,14 @@ int main()
         "The digit at position " + to_string(rideClue14Pos + 1) + " is " + rideClue14Dir + " than the digit after it."
     };
 
+    map<string, string> keywordPool =
+    {
+        {"FORGOTTEN", "they will not be FORGOTTEN."},
+        {"RETURN", "may Gus one day RETURN."},
+        {"REMEMBER", "we are still waiting for Gus to REMEMBER"},
+        {"FORGIVEN", "will Gus ever be FORGIVEN?"}
+    };
+
     //initialize game booths, food stands, rides, and special
     GameBooth typingGame("TYPING GAME", "A booth where you test your typing skills.\n", 3);
     GameBooth countingGame("COUNTING GAME", "A booth where you test your counting skills.\n", 3);
@@ -2922,14 +3180,19 @@ int main()
     Location* currentLocation = nullptr;
     player.passcode = passcode;
 
+    auto it = keywordPool.begin();
+    advance(it, rand() % keywordPool.size());
+    player.keyword = it->first;
+    player.keywordSentence = it->second;
+
     //introduces the game to the player
     cout << "\n" << string(53, '-') << " INTRODUCTION " << string(53, '-') << "\n";
     cout << "Welcome " << player.name << "!\n\n";
 
     cout << "STORYLINE\n";
     cout << "* Gus the Great is the carnival's star magician.\n";
-    cout << "* And he has disappeared just hours before the carnival's biggest magic show is supposed to start.\n";
-    cout << "* Without him, the show cannot begin, and the carnival risks losing thousands of dollars.\n";
+    cout << "* Tonight is the carnival's biggest show of the year, and Gus is scheduled to headline.\n";
+    cout << "* But he has gone missing. Nobody knows where he is, and the show cannot start without him.\n";
     cout << "* Your mission is to explore the carnival, collect clues, and find Gus before the show begins!\n";
 
     cout << "\nPress ENTER to continue...";
@@ -2941,6 +3204,7 @@ int main()
     cout << "* You have 10 hours to find Gus\n";
     cout << "* Everytime you visit a location and complete its intended action, 5 minutes will pass\n";
     cout << "* Checking inventory or backing out of a location will not consume 5 minutes\n";
+    cout << "* When learning about Gus' behavior, try to mimic him\n";
 
     cout << "\nPress ENTER to continue...";
     getline(cin, enter);
@@ -3026,7 +3290,7 @@ int main()
             cout << "17. Inventory\n";
 
             //allows players to choose where to go
-            int choice = getValidInt("\nWhere would you like to go? (1-18): ", 1, 18);
+            int choice = getValidInt("\nWhere would you like to go? (1-17): ", 1, 17);
             cout << "\n" << string(45, '-') << "\n";
 
             //based on user input, assign the player's location pointer to a certain location
@@ -3150,11 +3414,22 @@ int main()
             }
 
             //calculate some win counts for the food clues
-            if (typingGame.winCount >= 1 && countingGame.winCount >= 1 && timeGuessingGame.winCount >= 1 && reactionGame.winCount >= 1 && colorGame.winCount >= 1 &&
-                memoryGame.winCount >= 1 && archeryGame.winCount >= 1 && trackingGame.winCount >= 1 && gridGame.winCount >= 1 && scanningGame.winCount >= 1)
+            int gamesWonAtLeastOnce = 0;
+			if (typingGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (countingGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (timeGuessingGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (reactionGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (colorGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (memoryGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (archeryGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (trackingGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (gridGame.winCount >= 1) gamesWonAtLeastOnce++;
+			if (scanningGame.winCount >= 1) gamesWonAtLeastOnce++;
+            if (gamesWonAtLeastOnce >= 7)
             {
-                player.completed1WinEachGame = true;
+				player.completed1WinFor7Games = true;
             }
+
             if (typingGame.winCount >= 7 || countingGame.winCount >= 7 || timeGuessingGame.winCount >= 7 || reactionGame.winCount >= 7 || colorGame.winCount >= 7 ||
                 memoryGame.winCount >= 7 || archeryGame.winCount >= 7 || trackingGame.winCount >= 7 || gridGame.winCount >= 7 || scanningGame.winCount >= 7)
             {
@@ -3162,12 +3437,12 @@ int main()
             }
 
             //if player completes food secret, player gets rewarded accordingly
-            if (player.hasFoodClue8 && foodClue8Index == 0 && player.completed1WinEachGame)
+            if (player.hasFoodClue8 && foodClue8Index == 0 && player.completed1WinFor7Games)
             {
                 if (!player.completedFoodClue8)
                 {
                     player.completedFoodClue8 = true;
-                    cout << "\nSECRET UNLOCKED: +5 Scrolls (For winning each game at least once)\n";
+                    cout << "\nSECRET UNLOCKED: +5 Scrolls (For winning 7 different games at least once)\n";
                     player.scrollCount += 5;
                 }
             }
@@ -3182,8 +3457,16 @@ int main()
             }
 
             //makes the player press enter to continue the next round, allowing for proper pacing
-            cout << "\nPress ENTER to continue...";
-            getline(cin, enter);
+            if (!gameOver)
+            {
+                cout << "\nPress ENTER to continue...";
+                getline(cin, enter);
+            }
+            else
+            {
+                cout << "\033[38;2;200;200;120m\nPress ENTER to continue...\033[0m";
+                getline(cin, enter);
+            }
 
             //separates each round, making it easier to read
             cout << "\n" << string(120, '-') << "\n";
